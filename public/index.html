@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>屏幕共享标注工具</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="landing-body">
+  <div class="landing-container">
+    <h1 class="landing-title">屏幕共享标注工具</h1>
+    <p class="landing-subtitle">局域网内实时屏幕共享 · 标注 · 语音连麦</p>
+
+    <div class="card-group">
+      <div class="card">
+        <h2>创建房间</h2>
+        <p>作为主持人，共享你的屏幕给其他人观看</p>
+        <input id="hostName" type="text" placeholder="你的昵称（可选）" maxlength="20">
+        <button id="createRoomBtn" class="btn btn-primary">创建房间并共享屏幕</button>
+      </div>
+
+      <div class="divider"><span>或</span></div>
+
+      <div class="card">
+        <h2>加入房间</h2>
+        <p>输入房间码，观看屏幕并参与标注</p>
+        <input id="joinName" type="text" placeholder="你的昵称（可选）" maxlength="20">
+        <input id="roomCodeInput" type="text" placeholder="6位房间码" maxlength="6" inputmode="numeric">
+        <button id="joinRoomBtn" class="btn btn-secondary">加入房间</button>
+      </div>
+    </div>
+
+    <div id="errorMsg" class="error-msg"></div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

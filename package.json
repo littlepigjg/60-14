@@ -1,0 +1,14 @@
+{
+  "name": "screen-share-annotator",
+  "version": "1.0.0",
+  "description": "LAN屏幕共享标注工具 - WebRTC实现",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2"
+  }
+}
