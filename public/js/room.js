@@ -205,9 +205,53 @@
       strokeValue.textContent = v;
       ann.setStroke(v);
     });
-    $('#undoBtn').addEventListener('click', () => ann.undo());
+    const undoBtn = $('#undoBtn');
+    const redoBtn = $('#redoBtn');
+
+    function updateUndoRedoButtons() {
+      undoBtn.disabled = !ann.canUndo();
+      redoBtn.disabled = !ann.canRedo();
+      undoBtn.style.opacity = ann.canUndo() ? '1' : '0.4';
+      redoBtn.style.opacity = ann.canRedo() ? '1' : '0.4';
+      undoBtn.style.cursor = ann.canUndo() ? 'pointer' : 'not-allowed';
+      redoBtn.style.cursor = ann.canRedo() ? 'pointer' : 'not-allowed';
+    }
+
+    undoBtn.addEventListener('click', () => {
+      if (ann.undo()) {
+        updateUndoRedoButtons();
+      }
+    });
+
+    redoBtn.addEventListener('click', () => {
+      if (ann.redo()) {
+        updateUndoRedoButtons();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (ann.undo()) updateUndoRedoButtons();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+        e.preventDefault();
+        if (ann.redo()) updateUndoRedoButtons();
+      }
+    });
+
+    const originalPushCommand = ann._pushCommand.bind(ann);
+    ann._pushCommand = function(cmd) {
+      originalPushCommand(cmd);
+      updateUndoRedoButtons();
+    };
+
+    updateUndoRedoButtons();
+
     $('#clearBtn').addEventListener('click', () => {
-      if (confirm('确定清空所有标注吗？')) ann.clearAll();
+      if (confirm('确定清空所有标注吗？')) {
+        ann.clearAll();
+        updateUndoRedoButtons();
+      }
     });
   }
 

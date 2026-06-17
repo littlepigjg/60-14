@@ -15,9 +15,25 @@ class AnnotationManager {
     this.eraserRadius = 16;
     this._dpr = window.devicePixelRatio || 1;
 
+    this.undoStack = [];
+    this.redoStack = [];
+    this.maxHistory = 50;
+
     this._setupCanvas();
     this._bindEvents();
     window.addEventListener('resize', () => this._setupCanvas());
+  }
+
+  _pushCommand(cmd) {
+    this.undoStack.push(cmd);
+    if (this.undoStack.length > this.maxHistory) {
+      this.undoStack.shift();
+    }
+    this.redoStack = [];
+  }
+
+  _isMyAnnotation(a) {
+    return a.authorId === this.signaling.clientId;
   }
 
   _setupCanvas() {
@@ -128,8 +144,26 @@ class AnnotationManager {
     }
 
     const toSend = JSON.parse(JSON.stringify(this.tempAnnotation));
+    toSend.authorId = this.signaling.clientId;
     this.annotations.push(toSend);
     this.signaling.sendAnnotation(toSend);
+
+    const added = toSend;
+    this._pushCommand({
+      type: 'add',
+      annotations: [added],
+      execute: () => {
+        this.annotations.push(added);
+        this.signaling.sendAnnotation(added);
+        this.render();
+      },
+      undo: () => {
+        this.annotations = this.annotations.filter(a => a.id !== added.id);
+        this.signaling.sendAnnotation({ id: added.id, __delete: true });
+        this.render();
+      }
+    });
+
     this.tempAnnotation = null;
     this.render();
   }
@@ -151,11 +185,45 @@ class AnnotationManager {
 
   _flushErasures() {
     if (this._deletedIds && this._deletedIds.length > 0) {
-      const ids = new Set(this._deletedIds);
-      this.annotations = this.annotations.filter(a => !ids.has(a.id));
+      const myDeletedIds = [];
+      const myDeletedAnnotations = [];
+
+      this._deletedIds.forEach(id => {
+        const ann = this.annotations.find(a => a.id === id);
+        if (ann && this._isMyAnnotation(ann)) {
+          myDeletedIds.push(id);
+          myDeletedAnnotations.push(JSON.parse(JSON.stringify(ann)));
+        }
+      });
+
+      const allIds = new Set(this._deletedIds);
+      this.annotations = this.annotations.filter(a => !allIds.has(a.id));
       this._deletedIds.forEach(id => {
         this.signaling.sendAnnotation({ id, __delete: true });
       });
+
+      if (myDeletedAnnotations.length > 0) {
+        const deleted = myDeletedAnnotations;
+        this._pushCommand({
+          type: 'erase',
+          annotations: deleted,
+          execute: () => {
+            const ids = new Set(deleted.map(a => a.id));
+            this.annotations = this.annotations.filter(a => !ids.has(a.id));
+            deleted.forEach(a => {
+              this.signaling.sendAnnotation({ id: a.id, __delete: true });
+            });
+            this.render();
+          },
+          undo: () => {
+            deleted.forEach(a => {
+              this.annotations.push(JSON.parse(JSON.stringify(a)));
+              this.signaling.sendAnnotation(a);
+            });
+            this.render();
+          }
+        });
+      }
     }
     this._deletedIds = null;
     this.annotations.forEach(a => delete a._markedForDelete);
@@ -211,17 +279,46 @@ class AnnotationManager {
 
   clearAll() {
     this.annotations = [];
+    this.undoStack = [];
+    this.redoStack = [];
     this.render();
     this.signaling.clearAnnotations();
   }
 
+  canUndo() {
+    return this.undoStack.length > 0;
+  }
+
+  canRedo() {
+    return this.redoStack.length > 0;
+  }
+
   undo() {
-    const myAnns = this.annotations.filter(a => a.authorId === this.signaling.clientId);
-    if (myAnns.length === 0) return;
-    const last = myAnns[myAnns.length - 1];
-    this.annotations = this.annotations.filter(a => a.id !== last.id);
-    this.signaling.sendAnnotation({ id: last.id, __delete: true });
-    this.render();
+    if (this.undoStack.length === 0) return false;
+    const cmd = this.undoStack.pop();
+    try {
+      cmd.undo();
+      this.redoStack.push(cmd);
+      return true;
+    } catch (e) {
+      console.error('Undo failed:', e);
+      this.undoStack.push(cmd);
+      return false;
+    }
+  }
+
+  redo() {
+    if (this.redoStack.length === 0) return false;
+    const cmd = this.redoStack.pop();
+    try {
+      cmd.execute();
+      this.undoStack.push(cmd);
+      return true;
+    } catch (e) {
+      console.error('Redo failed:', e);
+      this.redoStack.push(cmd);
+      return false;
+    }
   }
 
   setTool(tool) {
